@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VGF Service Planer</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -150,15 +158,6 @@
         
         .btn-login:hover {
             background: #4f46e5;
-        }
-        
-        .login-info {
-            margin-top: 1.5rem;
-            padding: 0;
-            background: transparent;
-            text-align: center;
-            font-size: 0.875rem;
-            color: #94a3b8;
         }
         
         /* Main Layout */
@@ -958,22 +957,35 @@
                 </div>
             </div>
             <h2 class="login-title">VGF Service</h2>
-            <p class="login-subtitle">Planer Pro</p>
+            <p class="login-subtitle">Online Planer Pro</p>
             
             <div class="form-group">
-                <label class="form-label">Benutzername / E-Mail</label>
-                <input type="text" id="loginUsername" class="form-input" placeholder="Benutzername" autocomplete="username" onkeypress="if(event.key==='Enter') handleLogin()">
+                <label class="form-label">Benutzername</label>
+                <input type="text" id="loginUsername" class="form-input" placeholder="Benutzername" autocomplete="username">
             </div>
             
             <div class="form-group">
                 <label class="form-label">Passwort</label>
-                <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" autocomplete="current-password" onkeypress="if(event.key==='Enter') handleLogin()">
+                <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" autocomplete="current-password">
             </div>
             
-            <button type="button" class="btn-login" onclick="handleLogin(); return false;">Anmelden</button>
+            <button type="button" class="btn-login" onclick="handleLogin()">Anmelden</button>
             
             <div id="loginError" style="margin-top: 1rem; padding: 0.75rem; background: #fee2e2; color: #991b1b; border-radius: 0.75rem; font-size: 0.875rem; display: none;">
                 Ungültige Anmeldedaten
+            </div>
+            
+            <!-- Nur für Entwicklungsmodus -->
+            <div id="devHint" style="margin-top: 1rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.5rem; font-size: 0.75rem; color: #92400e; text-align: center; display: none;">
+                🔧 Entwicklungsmodus
+            </div>
+            
+            <!-- Sync Status -->
+            <div id="connectionStatus" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.75rem; display: none;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem;">
+                    <span id="statusDot" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                    <span id="statusText">Verbinde...</span>
+                </div>
             </div>
         </div>
     </div>
@@ -998,13 +1010,17 @@
                     </svg>
                     <div class="sidebar-logo-text">
                         <h1>VGF Service</h1>
-                        <p>Personalplaner</p>
+                        <p>Online Planer</p>
+                        <div id="onlineStatus" style="font-size: 0.625rem; color: #10b981; display: flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem;">
+                            <span id="onlineDot" style="width: 6px; height: 6px; background: #10b981; border-radius: 50%; display: inline-block;"></span>
+                            <span id="onlineText">Online</span>
+                        </div>
                     </div>
                 </div>
             </div>
             
             <nav class="sidebar-nav" id="navigation">
-                <!-- Navigation items will be inserted here -->
+                <!-- Navigation wird dynamisch geladen -->
             </nav>
             
             <div class="sidebar-footer">
@@ -1037,14 +1053,13 @@
                         </div>
                     </div>
                     <div class="header-right">
-                        <button class="icon-btn">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                            </svg>
-                            <span class="badge"></span>
-                        </button>
-                        <button type="button" class="btn-danger" onclick="handleLogout(); return false;">
+                        <!-- Sync Status -->
+                        <div id="syncStatus" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.75rem; background: #d1fae5; border-radius: 0.5rem; font-size: 0.75rem; color: #065f46;">
+                            <span id="syncIcon">🔄</span>
+                            <span id="syncText">Echtzeit</span>
+                        </div>
+                        
+                        <button type="button" class="btn-danger" onclick="handleLogout()">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -1058,36 +1073,78 @@
             
             <!-- Content -->
             <main class="content" id="mainContent">
-                <!-- Content will be dynamically loaded here -->
+                <!-- Wird dynamisch geladen -->
             </main>
         </div>
     </div>
 
     <script>
+        // ============================================
+        // FIREBASE KONFIGURATION
+        // ============================================
+        // ERSTELLE EIN FIREBASE-PROJEKT UNTER: https://firebase.google.com
+        const firebaseConfig = {
+            apiKey: "DEIN_API_KEY_HIER",
+            authDomain: "DEIN_PROJEKT.firebaseapp.com",
+            databaseURL: "https://DEIN_PROJEKT-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "DEIN_PROJEKT",
+            storageBucket: "DEIN_PROJEKT.appspot.com",
+            messagingSenderId: "DEIN_SENDER_ID",
+            appId: "DEIN_APP_ID"
+        };
+
+        // Firebase initialisieren
+        let app;
+        let auth;
+        let database;
+        let isOnline = true;
+        let offlineMode = false;
+        
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            database = firebase.database();
+            console.log("✅ Firebase initialisiert");
+        } catch (error) {
+            console.warn("⚠️ Firebase konnte nicht initialisiert werden");
+            offlineMode = true;
+        }
+
+        // ============================================
+        // HAUPTADMIN KONFIGURATION (VERSTECKT)
+        // ============================================
+        const MAIN_ADMIN = {
+            username: "marvinVGF",
+            password: "vgf123",
+            name: "Marvin",
+            role: "admin",
+            id: "admin-marvin-permanent"
+        };
+
         // Rollen-Definition
         const ROLES = {
-            admin: { label: 'Administrator', color: 'red' },
-            kleinadmin: { label: 'Kleinadmin', color: 'orange' },
-            einsatzleiter: { label: 'Einsatzleiter', color: 'purple' },
-            supervisor: { label: 'Supervisor', color: 'purple' },
-            teamleader: { label: 'Schichtleiter', color: 'blue' },
-            security_guard: { label: 'Sicherheitsmitarbeiter', color: 'gray' },
-            trainee: { label: 'Auszubildender', color: 'gray' },
-            doorman: { label: 'Türsteher', color: 'gray' },
-            event_security: { label: 'Veranstaltungsschutz', color: 'gray' },
-            ordner: { label: 'Ordner', color: 'gray' },
-            reception: { label: 'Pforte/Empfang', color: 'gray' }
+            admin: { label: 'Administrator', color: 'red', level: 100 },
+            kleinadmin: { label: 'Kleinadmin', color: 'orange', level: 90 },
+            einsatzleiter: { label: 'Einsatzleiter', color: 'purple', level: 80 },
+            supervisor: { label: 'Supervisor', color: 'purple', level: 70 },
+            teamleader: { label: 'Schichtleiter', color: 'blue', level: 60 },
+            security_guard: { label: 'Sicherheitsmitarbeiter', color: 'gray', level: 10 },
+            trainee: { label: 'Auszubildender', color: 'gray', level: 5 },
+            doorman: { label: 'Türsteher', color: 'gray', level: 10 },
+            event_security: { label: 'Veranstaltungsschutz', color: 'gray', level: 10 },
+            ordner: { label: 'Ordner', color: 'gray', level: 10 },
+            reception: { label: 'Pforte/Empfang', color: 'gray', level: 10 }
         };
 
         // Navigation Items
         const navigationItems = [
-            { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
-            { id: 'planning', label: 'Einsatzplanung', icon: 'calendar' },
-            { id: 'employees', label: 'Mitarbeiter', icon: 'users' },
-            { id: 'timekeeping', label: 'Zeiterfassung', icon: 'clock' },
-            { id: 'control', label: 'Einsatzzentrale', icon: 'map' },
-            { id: 'reports', label: 'Berichte', icon: 'download' },
-            { id: 'settings', label: 'Einstellungen', icon: 'settings' }
+            { id: 'dashboard', label: 'Dashboard', icon: 'chart', adminOnly: true },
+            { id: 'planning', label: 'Einsatzplanung', icon: 'calendar', adminOnly: false },
+            { id: 'employees', label: 'Mitarbeiter', icon: 'users', adminOnly: true },
+            { id: 'timekeeping', label: 'Zeiterfassung', icon: 'clock', adminOnly: false },
+            { id: 'control', label: 'Einsatzzentrale', icon: 'map', adminOnly: true },
+            { id: 'reports', label: 'Berichte', icon: 'download', adminOnly: true },
+            { id: 'settings', label: 'Einstellungen', icon: 'settings', adminOnly: false }
         ];
 
         // App State
@@ -1096,150 +1153,74 @@
         let sidebarOpen = true;
         let users = [];
         let shifts = [];
-        let selectedDate = new Date().toISOString().split('T')[0];
         let timeEntries = [];
+        let selectedDate = new Date().toISOString().split('T')[0];
         let activeTimer = null;
-
-        // ==================== BACKEND INTEGRATION ====================
-        const API_URL = window.location.origin;
-        let authToken = localStorage.getItem('vgf_auth_token');
-        let wsConnection = null;
-
-        async function apiRequest(endpoint, method = 'GET', data = null) {
-            const options = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': authToken ? `Bearer ${authToken}` : ''
-                }
-            };
-            
-            if (data && method !== 'GET') {
-                options.body = JSON.stringify(data);
-            }
-            
-            try {
-                const response = await fetch(`${API_URL}${endpoint}`, options);
-                
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        handleLogout();
-                        throw new Error('Bitte erneut anmelden');
-                    }
-                    throw new Error('API Fehler');
-                }
-                
-                return await response.json();
-            } catch (error) {
-                console.error('API Error:', error);
-                throw error;
-            }
-        }
-
-        function connectWebSocket() {
-            const wsUrl = API_URL.replace('http', 'ws');
-            wsConnection = new WebSocket(wsUrl);
-            
-            wsConnection.onopen = () => console.log('🔌 WebSocket verbunden');
-            wsConnection.onmessage = async (event) => {
-                const data = JSON.parse(event.data);
-                console.log('📡 Update:', data.type);
-                await loadDataFromAPI();
-                renderContent();
-            };
-            wsConnection.onclose = () => {
-                console.log('🔌 Reconnecting...');
-                setTimeout(connectWebSocket, 5000);
-            };
-        }
-
-        async function loadDataFromAPI() {
-            try {
-                [users, shifts, timeEntries] = await Promise.all([
-                    apiRequest('/api/users'),
-                    apiRequest('/api/shifts'),
-                    apiRequest('/api/time-entries')
-                ]);
-            } catch (error) {
-                console.error('Fehler:', error);
-            }
-        }
-        // ==================== END BACKEND INTEGRATION ====================
-
-
-        // Helper function: Check if user has admin rights
-        function isAdmin(user) {
-            return user && (user.role === 'admin' || user.role === 'kleinadmin');
-        }
         
-        // Helper function: Check if user can confirm attendance
-        function canConfirmAttendance(user) {
-            return user && (user.role === 'admin' || user.role === 'kleinadmin' || user.role === 'einsatzleiter');
-        }
-        
-        // Helper function: Check if user can manage
-        function canManage(user) {
-            return isAdmin(user) || user?.permissions?.canManageShifts || user?.permissions?.canManageEmployees;
-        }
+        // Firebase Listeners
+        let usersRef;
+        let shiftsRef;
+        let timeEntriesRef;
+        let activeListeners = [];
 
-        // Initialize
+        // ============================================
+        // INITIALISIERUNG
+        // ============================================
         function init() {
-            loadData();
-            ensureDefaultAdmin();
-            migrateShiftsToMultiEmployee(); // Migrate old single-employee shifts
+            // Firebase Connection Listener
+            if (database) {
+                const connectedRef = database.ref(".info/connected");
+                connectedRef.on("value", (snap) => {
+                    isOnline = snap.val() === true;
+                    updateConnectionStatus(isOnline, isOnline ? "Online" : "Offline");
+                    
+                    if (isOnline && !offlineMode) {
+                        setupFirebaseListeners();
+                    }
+                });
+            }
+            
+            // Lokale Daten laden
+            loadLocalData();
+            ensureMainAdmin();
             updateCurrentDate();
             setInterval(updateCurrentDate, 60000);
-        }
-        
-        function migrateShiftsToMultiEmployee() {
-            // Convert old shifts with single employeeId to new format with employeeIds array
-            let migrated = false;
-            shifts = shifts.map(shift => {
-                if (shift.employeeId && !shift.employeeIds) {
-                    migrated = true;
-                    return {
-                        ...shift,
-                        employeeIds: shift.employeeId ? [shift.employeeId] : [],
-                        employeeId: undefined // Remove old field
-                    };
-                }
-                if (!shift.employeeIds) {
-                    shift.employeeIds = [];
-                }
-                return shift;
+            
+            // Enter-Key für Login
+            document.getElementById('loginUsername').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') handleLogin();
             });
-            if (migrated) {
-                saveData();
+            
+            document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') handleLogin();
+            });
+            
+            // Entwickler-Hinweis nur auf localhost
+            if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+                document.getElementById('devHint').style.display = 'block';
             }
+            
+            console.log("🔧 VGF Service Planer gestartet");
         }
 
-        async function loadData() {
-            await loadDataFromAPI();
-        }
-        
-        function loadDataOld() {
-            users = JSON.parse(localStorage.getItem('vgf_users') || '[]');
-            shifts = JSON.parse(localStorage.getItem('vgf_shifts') || '[]');
-            timeEntries = JSON.parse(localStorage.getItem('vgf_time_entries') || '[]');
-        }
-
-        function saveData() {
-            localStorage.setItem('vgf_users', JSON.stringify(users));
-            localStorage.setItem('vgf_shifts', JSON.stringify(shifts));
-            localStorage.setItem('vgf_time_entries', JSON.stringify(timeEntries));
-        }
-
-        function ensureDefaultAdmin() {
-            if (!users.find(u => u.username === 'marvinVGF')) {
-                users.push({
-                    id: 'admin-marvin',
-                    name: 'Marvin',
-                    username: 'marvinVGF',
-                    password: 'vgf123',
-                    role: 'admin',
-                    regNumber: '',
-                    email: 'marvin@vgf-service.de',
-                    phone: '',
+        // ============================================
+        // HAUPTPUNKT: MAIN ADMIN SICHERSTELLEN
+        // ============================================
+        function ensureMainAdmin() {
+            const mainAdminExists = users.some(u => u.id === MAIN_ADMIN.id);
+            
+            if (!mainAdminExists) {
+                console.log("📋 Erstelle Hauptadmin...");
+                
+                const mainAdmin = {
+                    id: MAIN_ADMIN.id,
+                    name: MAIN_ADMIN.name,
+                    username: MAIN_ADMIN.username,
+                    password: MAIN_ADMIN.password,
+                    role: MAIN_ADMIN.role,
+                    regNumber: "ADMIN-001",
+                    email: "marvin@vgf-service.de",
+                    phone: "",
                     status: 'aktiv',
                     hours: 0,
                     overtime: 0,
@@ -1250,119 +1231,564 @@
                         canManageEmployees: true,
                         canAssignShifts: true,
                         canViewAllShifts: true,
-                        canEditOwnShifts: true
+                        canEditOwnShifts: true,
+                        canDeleteEverything: true,
+                        isSuperAdmin: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    isMainAdmin: true
+                };
+                
+                users.push(mainAdmin);
+                console.log("✅ Hauptadmin erstellt");
+                
+                if (isOnline && database && !offlineMode) {
+                    syncMainAdminToFirebase(mainAdmin);
+                }
+                
+                saveLocalData();
+            } else {
+                const mainAdminIndex = users.findIndex(u => u.id === MAIN_ADMIN.id);
+                if (mainAdminIndex !== -1) {
+                    users[mainAdminIndex].permissions = {
+                        canManageShifts: true,
+                        canManageEmployees: true,
+                        canAssignShifts: true,
+                        canViewAllShifts: true,
+                        canEditOwnShifts: true,
+                        canDeleteEverything: true,
+                        isSuperAdmin: true
+                    };
+                    users[mainAdminIndex].isMainAdmin = true;
+                    
+                    saveLocalData();
+                    if (isOnline && database && !offlineMode) {
+                        syncMainAdminToFirebase(users[mainAdminIndex]);
                     }
-                });
-                saveData();
+                }
+            }
+        }
+        
+        function syncMainAdminToFirebase(mainAdmin) {
+            if (!database || offlineMode) return;
+            
+            try {
+                database.ref('users/' + MAIN_ADMIN.id).set(mainAdmin);
+                console.log("✅ Hauptadmin zu Firebase gesynct");
+            } catch (error) {
+                console.error("Fehler beim Sync des Hauptadmins:", error);
             }
         }
 
-        function updateCurrentDate() {
-            const date = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('currentDate').textContent = date.toLocaleDateString('de-DE', options);
+        // ============================================
+        // FIREBASE FUNKTIONEN
+        // ============================================
+        function setupFirebaseListeners() {
+            if (!database || offlineMode) return;
+            
+            activeListeners.forEach(ref => ref.off());
+            activeListeners = [];
+            
+            console.log("🔄 Firebase Listener werden eingerichtet...");
+            
+            // Users Listener
+            usersRef = database.ref('users');
+            usersRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const firebaseUsers = Object.values(data);
+                    
+                    const mainAdminInFirebase = firebaseUsers.some(u => u.id === MAIN_ADMIN.id);
+                    if (!mainAdminInFirebase) {
+                        const mainAdmin = users.find(u => u.id === MAIN_ADMIN.id);
+                        if (mainAdmin) {
+                            syncMainAdminToFirebase(mainAdmin);
+                        }
+                    }
+                    
+                    const mergedUsers = [...firebaseUsers];
+                    
+                    const localMainAdmin = users.find(u => u.id === MAIN_ADMIN.id);
+                    if (localMainAdmin) {
+                        const existingIndex = mergedUsers.findIndex(u => u.id === MAIN_ADMIN.id);
+                        if (existingIndex !== -1) {
+                            mergedUsers[existingIndex] = localMainAdmin;
+                        } else {
+                            mergedUsers.push(localMainAdmin);
+                        }
+                    }
+                    
+                    users = mergedUsers;
+                    console.log('👥 Users aktualisiert:', users.length);
+                    
+                    localStorage.setItem('vgf_users_cloud', JSON.stringify(users));
+                    
+                    if (currentUser) {
+                        renderNavigation();
+                        if (currentView === 'employees' || currentView === 'dashboard') {
+                            renderContent();
+                        }
+                    }
+                }
+            });
+            activeListeners.push(usersRef);
+            
+            // Shifts Listener
+            shiftsRef = database.ref('shifts');
+            shiftsRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                shifts = data ? Object.values(data) : [];
+                console.log('📅 Shifts aktualisiert:', shifts.length);
+                
+                localStorage.setItem('vgf_shifts_cloud', JSON.stringify(shifts));
+                
+                if (currentUser && (currentView === 'planning' || currentView === 'dashboard' || currentView === 'control')) {
+                    renderContent();
+                }
+            });
+            activeListeners.push(shiftsRef);
+            
+            // Time Entries Listener
+            timeEntriesRef = database.ref('timeEntries');
+            timeEntriesRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                timeEntries = data ? Object.values(data) : [];
+                console.log('⏱️ TimeEntries aktualisiert:', timeEntries.length);
+                
+                localStorage.setItem('vgf_time_entries_cloud', JSON.stringify(timeEntries));
+                
+                if (currentUser && currentView === 'timekeeping') {
+                    renderContent();
+                }
+            });
+            activeListeners.push(timeEntriesRef);
+            
+            updateSyncStatus(true);
         }
 
-        // Login
-        async function handleLogin() {
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
-            const errorDiv = document.getElementById('loginError');
+        function saveDataToFirebase(type, data) {
+            if (!database || offlineMode) {
+                saveLocalData();
+                return false;
+            }
             
             try {
-                const response = await fetch(`${API_URL}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                if (!response.ok) throw new Error('Ungültige Anmeldedaten');
-                
-                const data = await response.json();
-                authToken = data.token;
-                currentUser = data.user;
-                localStorage.setItem('vgf_auth_token', authToken);
-                
-                document.querySelector('.login-overlay').classList.add('hidden');
-                await init();
-                connectWebSocket();
-            } catch (error) {
-                if (errorDiv) {
-                    errorDiv.textContent = error.message;
-                    errorDiv.style.display = 'block';
-                    setTimeout(() => errorDiv.style.display = 'none', 3000);
+                const ref = database.ref(type);
+                if (Array.isArray(data)) {
+                    const firebaseData = {};
+                    data.forEach(item => {
+                        if (item.id) {
+                            firebaseData[item.id] = item;
+                        }
+                    });
+                    ref.set(firebaseData);
                 }
+                updateSyncStatus(true);
+                return true;
+            } catch (error) {
+                console.error('Fehler beim Speichern in Firebase:', error);
+                updateSyncStatus(false);
+                return false;
+            }
+        }
+
+        // ============================================
+        // DATEN-MANAGEMENT
+        // ============================================
+        function loadLocalData() {
+            try {
+                const cloudUsers = localStorage.getItem('vgf_users_cloud');
+                const cloudShifts = localStorage.getItem('vgf_shifts_cloud');
+                const cloudTimeEntries = localStorage.getItem('vgf_time_entries_cloud');
+                
+                if (cloudUsers) {
+                    const parsedUsers = JSON.parse(cloudUsers);
+                    const mainAdminIndex = parsedUsers.findIndex(u => u.id === MAIN_ADMIN.id);
+                    if (mainAdminIndex !== -1) {
+                        parsedUsers[mainAdminIndex].permissions = {
+                            canManageShifts: true,
+                            canManageEmployees: true,
+                            canAssignShifts: true,
+                            canViewAllShifts: true,
+                            canEditOwnShifts: true,
+                            canDeleteEverything: true,
+                            isSuperAdmin: true
+                        };
+                        parsedUsers[mainAdminIndex].isMainAdmin = true;
+                    }
+                    users = parsedUsers;
+                } else {
+                    users = JSON.parse(localStorage.getItem('vgf_users') || '[]');
+                }
+                
+                if (cloudShifts) {
+                    shifts = JSON.parse(cloudShifts);
+                } else {
+                    shifts = JSON.parse(localStorage.getItem('vgf_shifts') || '[]');
+                }
+                
+                if (cloudTimeEntries) {
+                    timeEntries = JSON.parse(cloudTimeEntries);
+                } else {
+                    timeEntries = JSON.parse(localStorage.getItem('vgf_time_entries') || '[]');
+                }
+            } catch (error) {
+                console.error("Fehler beim Laden der Daten:", error);
+                users = [];
+                shifts = [];
+                timeEntries = [];
+            }
+            
+            ensureMainAdmin();
+        }
+
+        function saveLocalData() {
+            try {
+                localStorage.setItem('vgf_users', JSON.stringify(users));
+                localStorage.setItem('vgf_shifts', JSON.stringify(shifts));
+                localStorage.setItem('vgf_time_entries', JSON.stringify(timeEntries));
+            } catch (error) {
+                console.error("Fehler beim lokalen Speichern:", error);
+            }
+        }
+
+        function saveData() {
+            console.log("💾 Speichere Daten...");
+            
+            ensureMainAdmin();
+            
+            if (isOnline && !offlineMode && database) {
+                console.log("🌐 Synchronisiere mit Firebase...");
+                
+                const usersSuccess = saveDataToFirebase('users', users);
+                const shiftsSuccess = saveDataToFirebase('shifts', shifts);
+                const timeEntriesSuccess = saveDataToFirebase('timeEntries', timeEntries);
+                
+                if (!usersSuccess || !shiftsSuccess || !timeEntriesSuccess) {
+                    console.warn("⚠️ Firebase Sync fehlgeschlagen, speichere lokal");
+                    saveLocalData();
+                }
+            } else {
+                console.log("📱 Speichere lokal (Offline-Modus)");
+                saveLocalData();
+            }
+        }
+
+        // ============================================
+        // AUTHENTIFIZIERUNG
+        // ============================================
+        function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            console.log("🔐 Login versuch mit:", username);
+            
+            if (!username || !password) {
+                showLoginError('Bitte Benutzername und Passwort eingeben');
+                return;
+            }
+            
+            // HAUPTPUNKT: Hauptadmin-Check
+            if (username === MAIN_ADMIN.username && password === MAIN_ADMIN.password) {
+                console.log("👑 Hauptadmin Login erkannt");
+                
+                let user = users.find(u => u.id === MAIN_ADMIN.id);
+                
+                if (!user) {
+                    console.log("📋 Erstelle neuen Hauptadmin...");
+                    user = {
+                        id: MAIN_ADMIN.id,
+                        name: MAIN_ADMIN.name,
+                        username: MAIN_ADMIN.username,
+                        password: MAIN_ADMIN.password,
+                        role: MAIN_ADMIN.role,
+                        regNumber: "ADMIN-001",
+                        email: "marvin@vgf-service.de",
+                        phone: "",
+                        status: 'aktiv',
+                        hours: 0,
+                        overtime: 0,
+                        pushNotification: true,
+                        lastSeen: new Date().toLocaleString('de-DE'),
+                        permissions: {
+                            canManageShifts: true,
+                            canManageEmployees: true,
+                            canAssignShifts: true,
+                            canViewAllShifts: true,
+                            canEditOwnShifts: true,
+                            canDeleteEverything: true,
+                            isSuperAdmin: true
+                        },
+                        isMainAdmin: true,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    users.push(user);
+                    console.log("✅ Hauptadmin erstellt");
+                    saveData();
+                } else {
+                    console.log("✅ Hauptadmin gefunden");
+                    
+                    user.permissions = {
+                        canManageShifts: true,
+                        canManageEmployees: true,
+                        canAssignShifts: true,
+                        canViewAllShifts: true,
+                        canEditOwnShifts: true,
+                        canDeleteEverything: true,
+                        isSuperAdmin: true
+                    };
+                    user.isMainAdmin = true;
+                    user.lastSeen = new Date().toLocaleString('de-DE');
+                    
+                    const userIndex = users.findIndex(u => u.id === MAIN_ADMIN.id);
+                    if (userIndex !== -1) {
+                        users[userIndex] = user;
+                    }
+                    
+                    saveData();
+                }
+                
+                currentUser = user;
+                
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                initializeApp();
+                
+                showNotification(`👑 Willkommen Hauptadmin ${currentUser.name}!`, 'success');
+                return;
+            }
+            
+            // Normale Benutzer-Authentifizierung
+            console.log("👤 Suche normalen Benutzer...");
+            const user = users.find(u => u.username === username && u.password === password);
+            
+            if (user) {
+                console.log("✅ Benutzer gefunden:", user.name);
+                currentUser = user;
+                
+                currentUser.lastSeen = new Date().toLocaleString('de-DE');
+                
+                const userIndex = users.findIndex(u => u.id === currentUser.id);
+                if (userIndex !== -1) {
+                    users[userIndex] = currentUser;
+                }
+                
+                saveData();
+                
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                initializeApp();
+                
+                showNotification(`Willkommen, ${currentUser.name}!`, 'success');
+            } else {
+                showLoginError('Ungültige Anmeldedaten');
             }
         }
         
         function handleLogout() {
             try {
-                console.log('handleLogout called');
-                
-                // Stop any running timers
-                if (typeof stopLiveTimer === 'function') {
-                    stopLiveTimer();
+                if (activeTimer) {
+                    clearInterval(activeTimer);
+                    activeTimer = null;
                 }
                 
-                // Clear current user but keep all data
+                if (activeListeners.length > 0) {
+                    activeListeners.forEach(ref => ref.off());
+                    activeListeners = [];
+                }
+                
                 currentUser = null;
-                currentView = 'planning'; // Reset to default
+                document.getElementById('mainApp').classList.add('hidden');
+                document.getElementById('loginScreen').classList.remove('hidden');
                 
-                console.log('Hiding mainApp...');
-                // Hide main app
-                const mainApp = document.getElementById('mainApp');
-                if (mainApp) {
-                    mainApp.classList.add('hidden');
-                } else {
-                    console.error('mainApp not found!');
-                }
+                document.getElementById('loginUsername').value = '';
+                document.getElementById('loginPassword').value = '';
+                document.getElementById('loginError').style.display = 'none';
                 
-                console.log('Showing loginScreen...');
-                // Show login screen
-                const loginScreen = document.getElementById('loginScreen');
-                if (loginScreen) {
-                    loginScreen.classList.remove('hidden');
-                } else {
-                    console.error('loginScreen not found!');
-                }
-                
-                // Clear login fields
-                const usernameField = document.getElementById('loginUsername');
-                const passwordField = document.getElementById('loginPassword');
-                const errorDiv = document.getElementById('loginError');
-                
-                if (usernameField) usernameField.value = '';
-                if (passwordField) passwordField.value = '';
-                if (errorDiv) errorDiv.style.display = 'none';
-                
-                console.log('Erfolgreich abgemeldet');
+                showNotification('Erfolgreich abgemeldet', 'success');
             } catch (error) {
-                console.error('Fehler beim Abmelden:', error);
-                alert('Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.');
+                console.error('Logout error:', error);
+                showNotification('Abmeldung fehlgeschlagen', 'error');
             }
         }
 
-        // Initialize App
+        // ============================================
+        // HELPER FUNCTIONS
+        // ============================================
+        function isAdmin(user) {
+            if (!user) return false;
+            
+            if (user.id === MAIN_ADMIN.id) return true;
+            
+            return user.role === 'admin' || user.role === 'kleinadmin' || 
+                   (user.permissions && (user.permissions.canManageShifts || user.permissions.canManageEmployees));
+        }
+        
+        function isMainAdmin(user) {
+            return user && (user.id === MAIN_ADMIN.id || user.isMainAdmin === true);
+        }
+        
+        function canConfirmAttendance(user) {
+            if (!user) return false;
+            
+            if (isMainAdmin(user)) return true;
+            
+            return user.role === 'admin' || user.role === 'kleinadmin' || user.role === 'einsatzleiter';
+        }
+        
+        function canManage(user) {
+            if (!user) return false;
+            
+            if (isMainAdmin(user)) return true;
+            
+            return isAdmin(user) || (user.permissions && 
+                   (user.permissions.canManageShifts || user.permissions.canManageEmployees));
+        }
+
+        function updateConnectionStatus(online, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const onlineDot = document.getElementById('onlineDot');
+            const onlineText = document.getElementById('onlineText');
+            const syncIcon = document.getElementById('syncIcon');
+            const syncText = document.getElementById('syncText');
+            
+            if (statusDiv && statusDot && statusText) {
+                statusDiv.style.display = 'flex';
+                statusDot.style.background = online ? '#10b981' : '#ef4444';
+                statusText.textContent = message;
+                statusDiv.style.background = online ? '#d1fae5' : '#fee2e2';
+                statusDiv.style.color = online ? '#065f46' : '#991b1b';
+            }
+            
+            if (onlineDot && onlineText) {
+                onlineDot.style.background = online ? '#10b981' : '#ef4444';
+                onlineText.textContent = online ? 'Online' : 'Offline';
+                onlineText.style.color = online ? '#10b981' : '#ef4444';
+            }
+            
+            if (syncIcon && syncText && document.getElementById('syncStatus')) {
+                const syncStatus = document.getElementById('syncStatus');
+                if (online) {
+                    syncIcon.textContent = '🔄';
+                    syncText.textContent = 'Echtzeit';
+                    syncStatus.style.background = '#d1fae5';
+                    syncStatus.style.color = '#065f46';
+                } else {
+                    syncIcon.textContent = '⚠️';
+                    syncText.textContent = 'Offline';
+                    syncStatus.style.background = '#fef3c7';
+                    syncStatus.style.color = '#92400e';
+                }
+            }
+        }
+        
+        function updateSyncStatus(syncing) {
+            const syncIcon = document.getElementById('syncIcon');
+            const syncText = document.getElementById('syncText');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            if (syncIcon && syncText && syncStatus) {
+                if (syncing) {
+                    syncIcon.textContent = '🔄';
+                    syncText.textContent = 'Sync...';
+                    syncStatus.style.background = '#dbeafe';
+                    syncStatus.style.color = '#1e40af';
+                    
+                    setTimeout(() => {
+                        if (isOnline) {
+                            syncIcon.textContent = '✅';
+                            syncText.textContent = 'Echtzeit';
+                            syncStatus.style.background = '#d1fae5';
+                            syncStatus.style.color = '#065f46';
+                        }
+                    }, 2000);
+                }
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 0.5rem;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                max-width: 400px;
+            `;
+            
+            if (type === 'success') {
+                notification.style.background = '#10b981';
+                notification.style.color = 'white';
+                notification.innerHTML = `✅ ${message}`;
+            } else if (type === 'error') {
+                notification.style.background = '#ef4444';
+                notification.style.color = 'white';
+                notification.innerHTML = `❌ ${message}`;
+            } else {
+                notification.style.background = '#3b82f6';
+                notification.style.color = 'white';
+                notification.innerHTML = `ℹ️ ${message}`;
+            }
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transition = 'opacity 0.3s';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // ============================================
+        // APP FUNKTIONEN
+        // ============================================
         function initializeApp() {
             document.getElementById('userName').textContent = currentUser.name;
             document.getElementById('userEmail').textContent = currentUser.username;
             document.getElementById('userAvatar').textContent = getInitials(currentUser.name);
             
-            // Load dark mode preference
+            // Hauptadmin-Styling
+            if (isMainAdmin(currentUser)) {
+                document.getElementById('userAvatar').style.background = '#ef4444';
+            }
+            
             const darkMode = localStorage.getItem('vgf_darkmode') === 'true';
             if (darkMode) {
                 document.body.classList.add('dark-mode');
             }
             
-            // Mark all shifts as viewed by current user if employee
+            if (isOnline && !offlineMode && database) {
+                setupFirebaseListeners();
+            }
+            
             if (!isAdmin(currentUser)) {
                 markAllShiftsAsViewed();
-                checkAndStartShiftTimer(); // Check if user should be auto-clocked in
+                checkAndStartShiftTimer();
             }
             
             renderNavigation();
             
-            // Normal employees start at planning view
             if (isAdmin(currentUser)) {
                 changeView('dashboard');
             } else {
@@ -1370,67 +1796,16 @@
             }
         }
         
-        function checkAndStartShiftTimer() {
-            // Check if user is assigned to a shift happening right now
-            const now = new Date();
-            const today = now.toISOString().split('T')[0];
-            const currentTime = now.getHours() * 60 + now.getMinutes(); // minutes since midnight
-            
-            const currentShift = shifts.find(shift => {
-                if (shift.date !== today) return false;
-                if (!(shift.employeeIds || []).includes(currentUser.id)) return false;
-                
-                const [start, end] = shift.time.split('-');
-                const [startH, startM] = start.split(':').map(Number);
-                const [endH, endM] = end.split(':').map(Number);
-                const shiftStart = startH * 60 + startM;
-                const shiftEnd = endH * 60 + endM;
-                
-                return currentTime >= shiftStart && currentTime <= shiftEnd;
-            });
-            
-            if (currentShift) {
-                // Auto-start timer if not already running
-                const todayEntries = timeEntries.filter(e => 
-                    e.userId === currentUser.id && 
-                    e.date === today &&
-                    !e.endTime
-                );
-                
-                if (todayEntries.length === 0) {
-                    // No active timer, start one
-                    console.log('Auto-starting timer for current shift');
-                    startTimer();
-                }
-            }
-        }
-        
-        function markAllShiftsAsViewed() {
-            let updated = false;
-            shifts.forEach(shift => {
-                if (!shift.viewedBy) shift.viewedBy = [];
-                if (!shift.viewedBy.includes(currentUser.id)) {
-                    shift.viewedBy.push(currentUser.id);
-                    updated = true;
-                }
-            });
-            if (updated) {
-                saveData();
-            }
-        }
-
         function renderNavigation() {
             const nav = document.getElementById('navigation');
+            if (!nav) return;
             
-            // Filter navigation items based on user role
-            let visibleItems = navigationItems;
-            
-            if (!isAdmin(currentUser)) {
-                // Normal employees see Planning and Timekeeping
-                visibleItems = navigationItems.filter(item => 
-                    item.id === 'planning' || item.id === 'timekeeping'
-                );
-            }
+            const visibleItems = navigationItems.filter(item => {
+                if (item.adminOnly && !isAdmin(currentUser)) {
+                    return false;
+                }
+                return true;
+            });
             
             nav.innerHTML = visibleItems.map(item => `
                 <button class="nav-item ${item.id === currentView ? 'active' : ''}" onclick="changeView('${item.id}')">
@@ -1439,20 +1814,31 @@
                 </button>
             `).join('');
         }
-
+        
         function changeView(view) {
             currentView = view;
-            document.getElementById('viewTitle').textContent = navigationItems.find(i => i.id === view)?.label || 'Dashboard';
+            const navItem = navigationItems.find(i => i.id === view);
+            if (navItem) {
+                document.getElementById('viewTitle').textContent = navItem.label;
+            }
             renderNavigation();
             renderContent();
         }
-
+        
+        function updateCurrentDate() {
+            const date = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = date.toLocaleDateString('de-DE', options);
+        }
+        
         function toggleSidebar() {
             sidebarOpen = !sidebarOpen;
             document.getElementById('sidebar').classList.toggle('collapsed');
         }
 
-        // Render Content
+        // ============================================
+        // RENDER FUNKTIONEN (Auszug - wichtigste)
+        // ============================================
         function renderContent() {
             const content = document.getElementById('mainContent');
             
@@ -1476,12 +1862,11 @@
                     content.innerHTML = renderReports();
                     break;
                 case 'settings':
-                    content.innerHTML = renderComingSoon(currentView);
+                    content.innerHTML = renderSettings();
                     break;
             }
         }
-
-        // Dashboard
+        
         function renderDashboard() {
             const employees = users.filter(u => u.role !== 'admin');
             const activeEmployees = employees.filter(e => e.status === 'aktiv');
@@ -1658,8 +2043,7 @@
                 </div>
             `;
         }
-
-        // Planning
+        
         function renderPlanning() {
             const userIsAdmin = isAdmin(currentUser);
             const isCurrentUserAssigned = (shift) => (shift.employeeIds || []).includes(currentUser.id);
@@ -1840,8 +2224,7 @@
                 </div>
             `;
         }
-
-        // Employees
+        
         function renderEmployees() {
             const employees = users.filter(u => u.role !== 'admin');
             
@@ -1946,8 +2329,7 @@
                 ` : ''}
             `;
         }
-
-        // Timekeeping
+        
         function renderTimekeeping() {
             if (isAdmin(currentUser)) {
                 return renderTimekeepingAdmin();
@@ -2079,12 +2461,11 @@
                                 </thead>
                                 <tbody>
                                     ${todayEntries.map(entry => {
-                                        // Get approved break time from shift
                                         const userShift = shifts.find(s => 
                                             s.date === entry.date && 
                                             (s.employeeIds || []).includes(currentUser.id)
                                         );
-                                        const approvedBreak = (userShift?.breakMinutes || 0) * 60 * 1000; // minutes to milliseconds
+                                        const approvedBreak = (userShift?.breakMinutes || 0) * 60 * 1000;
                                         
                                         return `
                                         <tr>
@@ -2198,27 +2579,24 @@
             if (entry) {
                 entry.endTime = new Date().toISOString();
                 
-                // Find shift for this date and user to get approved break time
                 const today = entry.date;
                 const userShift = shifts.find(s => 
                     s.date === today && 
                     (s.employeeIds || []).includes(currentUser.id)
                 );
                 
-                // Set pause duration from shift's approved break time
                 if (userShift && userShift.breakMinutes) {
-                    entry.pauseDuration = userShift.breakMinutes * 60 * 1000; // Convert minutes to milliseconds
+                    entry.pauseDuration = userShift.breakMinutes * 60 * 1000;
                 } else {
-                    entry.pauseDuration = 0; // No approved break
+                    entry.pauseDuration = 0;
                 }
                 
-                entry.pauseStart = null; // Clear any pause tracking
+                entry.pauseStart = null;
                 
                 saveData();
                 renderContent();
                 stopLiveTimer();
                 
-                // Show summary
                 const workTime = new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime() - entry.pauseDuration;
                 alert(`✅ Arbeitszeit beendet!\n\nGesamtzeit: ${formatDuration(new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime())}\nPausenzeit: ${formatDuration(entry.pauseDuration)}\nArbeitszeit: ${formatDuration(workTime)}`);
             }
@@ -2258,13 +2636,10 @@
                 }
             }
         }
-
         
         function renderTimekeepingAdmin() {
             const today = new Date().toISOString().split('T')[0];
             const allEmployees = users.filter(u => !isAdmin(u));
-            
-            // Calculate stats for all employees
             const todayAllEntries = timeEntries.filter(e => e.date === today);
             const activeTimers = timeEntries.filter(e => !e.endTime);
             
@@ -2399,8 +2774,6 @@
                                 <tbody>
                                     ${todayAllEntries.map(entry => {
                                         const employee = users.find(u => u.id === entry.userId);
-                                        
-                                        // Get approved break time from shift
                                         const userShift = shifts.find(s => 
                                             s.date === entry.date && 
                                             (s.employeeIds || []).includes(entry.userId)
@@ -2435,8 +2808,7 @@
                 </div>
             `;
         }
-
-        // Control Center - Einsatzzentrale
+        
         function renderControlCenter() {
             const activeShifts = shifts.filter(s => s.date === new Date().toISOString().split('T')[0] && s.employeeId);
             const allEmployees = users.filter(u => u.role !== 'admin');
@@ -2588,8 +2960,7 @@
                 </div>
             `).join('');
         }
-
-        // Reports - Berichte & Statistiken
+        
         function renderReports() {
             const allEmployees = users.filter(u => !isAdmin(u));
             const totalHours = timeEntries.reduce((sum, e) => {
@@ -2597,7 +2968,7 @@
                     return sum + (new Date(e.endTime).getTime() - new Date(e.startTime).getTime() - (e.pauseDuration || 0));
                 }
                 return sum;
-            }, 0) / (1000 * 60 * 60); // Convert to hours
+            }, 0) / (1000 * 60 * 60);
             
             const totalShifts = shifts.length;
             const completedShifts = shifts.filter(s => s.completed).length;
@@ -2729,6 +3100,10 @@
                     </div>
                 </div>
                 
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            📊 Wochenstatistik
                         </h3>
                     </div>
                     <div class="card-body">
@@ -2796,65 +3171,6 @@
             `;
         }
         
-        function renderShiftTypeChart() {
-            const types = {};
-            shifts.forEach(shift => {
-                types[shift.type] = (types[shift.type] || 0) + 1;
-            });
-            
-            const colors = {
-                'Veranstaltung': '#10b981',
-                'Objektschutz': '#3b82f6',
-                'Revierdienst': '#f59e0b',
-                'Empfang': '#8b5cf6'
-            };
-            
-            const total = Object.values(types).reduce((a, b) => a + b, 0);
-            
-            return `
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    ${Object.entries(types).map(([type, count]) => {
-                        const percentage = Math.round((count / total) * 100);
-                        return `
-                            <div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                    <span style="font-weight: 500; color: var(--text-primary);">${type}</span>
-                                    <span style="font-weight: 600; color: var(--text-primary);">${count} (${percentage}%)</span>
-                                </div>
-                                <div style="width: 100%; height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
-                                    <div style="width: ${percentage}%; height: 100%; background: ${colors[type] || '#10b981'}; transition: width 0.3s;"></div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        }
-        
-        function renderEmployeeHoursChart() {
-            const allEmployees = users.filter(u => u.role !== 'admin').slice(0, 5);
-            const maxHours = Math.max(...allEmployees.map(e => e.hours || 0));
-            
-            return `
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    ${allEmployees.map(emp => {
-                        const percentage = maxHours > 0 ? Math.round((emp.hours / maxHours) * 100) : 0;
-                        return `
-                            <div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                    <span style="font-weight: 500; color: var(--text-primary);">${emp.name}</span>
-                                    <span style="font-weight: 600; color: var(--text-primary);">${emp.hours || 0}h</span>
-                                </div>
-                                <div style="width: 100%; height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
-                                    <div style="width: ${percentage}%; height: 100%; background: linear-gradient(90deg, #10b981, #059669); transition: width 0.3s;"></div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        }
-        
         function renderWeeklyShiftsChart() {
             const days = [];
             const today = new Date();
@@ -2887,86 +3203,10 @@
                 </div>
             `;
         }
-
-        function searchEmployees(term) {
-            const employees = users.filter(u => u.role !== 'admin');
-            const filtered = employees.filter(emp => 
-                emp.name.toLowerCase().includes(term.toLowerCase()) ||
-                emp.regNumber.toLowerCase().includes(term.toLowerCase())
-            );
-            
-            const list = document.getElementById('employeeList');
-            if (filtered.length === 0) {
-                list.innerHTML = '<div class="empty-state"><div class="empty-title">Keine Mitarbeiter gefunden</div></div>';
-            } else {
-                list.innerHTML = filtered.map(emp => {
-                    const empShifts = shifts.filter(s => s.employeeId === emp.id);
-                    const perms = [];
-                    if (emp.permissions) {
-                        if (emp.permissions.canManageShifts) perms.push('Schichten verwalten');
-                        if (emp.permissions.canManageEmployees) perms.push('Personal');
-                        if (emp.permissions.canAssignShifts) perms.push('Zuweisung');
-                    }
-                    
-                    return `
-                        <div class="employee-item">
-                            <div class="employee-left">
-                                <div class="employee-avatar-large">${getInitials(emp.name)}</div>
-                                <div class="employee-details">
-                                    <div class="employee-name">
-                                        ${emp.name}
-                                        <span class="badge badge-${getRoleBadgeColor(emp.role)}">
-                                            ${ROLES[emp.role]?.label || emp.role}
-                                        </span>
-                                    </div>
-                                    <div class="employee-meta">
-                                        ${emp.regNumber || emp.username} • ${empShifts.length} Schichten
-                                    </div>
-                                    ${perms.length > 0 ? `
-                                        <div style="font-size: 0.75rem; color: #10b981; margin-top: 0.25rem;">
-                                            🔑 ${perms.join(', ')}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <div class="employee-actions">
-                                <button class="btn-icon edit" onclick="editEmployee('${emp.id}')">
-                                    ${getIcon('edit')}
-                                </button>
-                                <button class="btn-icon delete" onclick="deleteEmployee('${emp.id}')">
-                                    ${getIcon('trash')}
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-
-        // Coming Soon & Settings
-        function renderComingSoon(view) {
-            if (view === 'settings') {
-                return renderSettings();
-            }
-            
-            const labels = {
-                timekeeping: 'Zeiterfassung',
-                control: 'Einsatzzentrale',
-                reports: 'Berichte'
-            };
-            
-            return `
-                <div class="empty-state" style="padding: 4rem 1rem;">
-                    <div class="empty-icon">${getIcon(view === 'timekeeping' ? 'clock' : view === 'control' ? 'map' : 'chart')}</div>
-                    <div class="empty-title">${labels[view]}</div>
-                    <div class="empty-text">Diese Funktion kommt bald...</div>
-                </div>
-            `;
-        }
         
         function renderSettings() {
             const darkMode = document.body.classList.contains('dark-mode');
-            const isAdmin = currentUser.role === 'admin';
+            const isAdminUser = currentUser.role === 'admin' || isMainAdmin(currentUser);
             
             return `
                 <div style="max-width: 800px; margin: 0 auto;">
@@ -2997,6 +3237,7 @@
                                     <div style="font-weight: 600; color: var(--text-primary);">${currentUser.name}</div>
                                     <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
                                         ${ROLES[currentUser.role]?.label || currentUser.role}
+                                        ${isMainAdmin(currentUser) ? ' 👑' : ''}
                                     </div>
                                     <div style="font-size: 0.875rem; color: var(--text-secondary);">
                                         ${currentUser.username}
@@ -3034,7 +3275,7 @@
                                 </div>
                             ` : ''}
                             
-                            ${isAdmin ? `
+                            ${isAdminUser ? `
                                 <h4 style="font-weight: 600; margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">
                                     💾 Datensicherung
                                 </h4>
@@ -3087,6 +3328,13 @@
                     </div>
                 </div>
             `;
+        }
+        
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('vgf_darkmode', isDark);
+            renderContent();
         }
         
         function createBackup() {
@@ -3143,12 +3391,10 @@
                     try {
                         const backupData = JSON.parse(e.target.result);
                         
-                        // Validate backup structure
                         if (!backupData.version || !backupData.data) {
                             throw new Error('Ungültiges Backup-Format');
                         }
                         
-                        // Restore data
                         if (backupData.data.users) {
                             users = backupData.data.users;
                             localStorage.setItem('vgf_users', JSON.stringify(users));
@@ -3166,7 +3412,6 @@
                         
                         alert(`✅ Backup erfolgreich wiederhergestellt!\n\nVersion: ${backupData.version}\nErstellt: ${new Date(backupData.timestamp).toLocaleString('de-DE')}\nVon: ${backupData.exportedBy}\n\nDie Seite wird neu geladen.`);
                         
-                        // Reload page
                         window.location.reload();
                         
                     } catch (error) {
@@ -3181,236 +3426,10 @@
             input.click();
             document.body.removeChild(input);
         }
-        
-        function toggleDarkMode() {
-            document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('vgf_darkmode', isDark);
-            renderContent();
-        }
 
-        // Modals
-        function addMyselfToShift(shiftId) {
-            const shift = shifts.find(s => s.id === shiftId);
-            if (!shift) {
-                alert('Fehler: Schicht nicht gefunden!');
-                return;
-            }
-            
-            if (!shift.employeeIds) shift.employeeIds = [];
-            
-            if (shift.employeeIds.includes(currentUser.id)) {
-                alert('Sie sind bereits für diese Schicht eingetragen!');
-                return;
-            }
-            
-            shift.employeeIds.push(currentUser.id);
-            saveData();
-            renderContent();
-            
-            // Success notification
-            const message = document.createElement('div');
-            message.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; font-weight: 600; z-index: 10000; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);';
-            message.textContent = `✅ Sie wurden für die Schicht eingetragen!`;
-            document.body.appendChild(message);
-            
-            setTimeout(() => {
-                message.style.transition = 'opacity 0.3s';
-                message.style.opacity = '0';
-                setTimeout(() => message.remove(), 300);
-            }, 2000);
-        }
-
-        function addEmployeeToShift(shiftId) {
-            const shift = shifts.find(s => s.id === shiftId);
-            if (!shift) return;
-            
-            const availableEmployees = users.filter(u => 
-                u.role !== 'admin' && 
-                !(shift.employeeIds || []).includes(u.id)
-            );
-            
-            if (availableEmployees.length === 0) {
-                alert('Alle Mitarbeiter sind bereits dieser Schicht zugewiesen.');
-                return;
-            }
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 class="modal-title">Mitarbeiter hinzufügen</h3>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
-                            ${getIcon('x')}
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label class="form-label">Standort: ${shift.location}</label>
-                            <label class="form-label">Datum: ${new Date(shift.date).toLocaleDateString('de-DE')} • ${shift.time}</label>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Mitarbeiter auswählen</label>
-                            <select id="addEmployeeSelect" class="form-input">
-                                <option value="">-- Mitarbeiter wählen --</option>
-                                ${availableEmployees.map(emp => `
-                                    <option value="${emp.id}">${emp.name} (${ROLES[emp.role]?.label})</option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        
-                        <div class="modal-actions">
-                            <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Abbrechen</button>
-                            <button class="btn-primary" onclick="confirmAddEmployeeToShift('${shiftId}')">Hinzufügen</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-        
-        function confirmAddEmployeeToShift(shiftId) {
-            const employeeId = document.getElementById('addEmployeeSelect').value;
-            if (!employeeId) {
-                alert('Bitte wählen Sie einen Mitarbeiter aus.');
-                return;
-            }
-            
-            const shift = shifts.find(s => s.id === shiftId);
-            if (!shift) return;
-            
-            if (!shift.employeeIds) shift.employeeIds = [];
-            
-            if (!shift.employeeIds.includes(employeeId)) {
-                shift.employeeIds.push(employeeId);
-                saveData();
-                
-                const employee = users.find(u => u.id === employeeId);
-                alert(`✅ ${employee?.name} wurde der Schicht hinzugefügt!`);
-            }
-            
-            document.querySelector('.modal-overlay').remove();
-            renderContent();
-        }
-        
-        function toggleAttendance(shiftId, employeeId) {
-            const shift = shifts.find(s => s.id === shiftId);
-            if (!shift) return;
-            
-            if (!shift.attendance) shift.attendance = {};
-            
-            const employee = users.find(u => u.id === employeeId);
-            const currentStatus = shift.attendance[employeeId]?.present || false;
-            
-            if (currentStatus) {
-                // Remove attendance
-                delete shift.attendance[employeeId];
-            } else {
-                // Get worked hours from time entry
-                const timeEntry = timeEntries.find(e => 
-                    e.userId === employeeId && 
-                    e.date === shift.date && 
-                    e.endTime
-                );
-                
-                const workedMs = timeEntry ? 
-                    (new Date(timeEntry.endTime).getTime() - new Date(timeEntry.startTime).getTime() - (timeEntry.pauseDuration || 0)) : 
-                    0;
-                const workedHours = (workedMs / (1000 * 60 * 60)).toFixed(2);
-                
-                // Mark as present
-                shift.attendance[employeeId] = {
-                    present: true,
-                    confirmedBy: currentUser.id,
-                    confirmedAt: new Date().toISOString(),
-                    hours: parseFloat(workedHours)
-                };
-            }
-            
-            saveData();
-            renderContent();
-            
-            const message = document.createElement('div');
-            message.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; font-weight: 600; z-index: 10000; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);';
-            message.textContent = currentStatus ? 
-                `${employee?.name} als abwesend markiert` : 
-                `✓ ${employee?.name} Anwesenheit bestätigt`;
-            document.body.appendChild(message);
-            
-            setTimeout(() => {
-                message.style.transition = 'opacity 0.3s';
-                message.style.opacity = '0';
-                setTimeout(() => message.remove(), 300);
-            }, 2000);
-        }
-        
-        function completeShift(shiftId) {
-            const shift = shifts.find(s => s.id === shiftId);
-            if (!shift) return;
-            
-            const assignedCount = (shift.employeeIds || []).length;
-            const confirmedCount = Object.keys(shift.attendance || {}).length;
-            
-            if (confirmedCount === 0) {
-                alert('Bitte bestätigen Sie mindestens einen Mitarbeiter bevor Sie die Schicht abschließen.');
-                return;
-            }
-            
-            if (confirm(`Schicht abschließen?\n\n${confirmedCount} von ${assignedCount} Mitarbeiter(n) bestätigt.\n\nNach dem Abschluss können keine Änderungen mehr vorgenommen werden.`)) {
-                shift.completed = true;
-                shift.completedBy = currentUser.id;
-                shift.completedAt = new Date().toISOString();
-                
-                saveData();
-                renderContent();
-                
-                alert(`✅ Schicht abgeschlossen!\n\nStandort: ${shift.location}\nDatum: ${new Date(shift.date).toLocaleDateString('de-DE')}\nBestätigte Mitarbeiter: ${confirmedCount}`);
-            }
-        }
-
-        function removeEmployeeFromShift(shiftId, employeeId) {
-            console.log('removeEmployeeFromShift called:', shiftId, employeeId);
-            
-            const shift = shifts.find(s => s.id === shiftId);
-            const employee = users.find(u => u.id === employeeId);
-            
-            console.log('Shift found:', shift);
-            console.log('Employee found:', employee);
-            console.log('Current employeeIds:', shift?.employeeIds);
-            
-            if (!shift || !employee) {
-                console.error('Shift or employee not found!');
-                alert('Fehler: Schicht oder Mitarbeiter nicht gefunden!');
-                return;
-            }
-            
-            // Direkt entfernen ohne Bestätigung für bessere UX
-            console.log('Removing employee without confirmation...');
-            console.log('Before filter - employeeIds:', shift.employeeIds);
-            shift.employeeIds = (shift.employeeIds || []).filter(id => id !== employeeId);
-            console.log('After filter - employeeIds:', shift.employeeIds);
-            
-            saveData();
-            console.log('Data saved');
-            
-            renderContent();
-            console.log('Content rendered');
-            
-            // Kurze Erfolgsmeldung
-            const message = document.createElement('div');
-            message.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; font-weight: 600; z-index: 10000; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);';
-            message.textContent = `✅ ${employee.name} wurde entfernt!`;
-            document.body.appendChild(message);
-            
-            setTimeout(() => {
-                message.style.transition = 'opacity 0.3s';
-                message.style.opacity = '0';
-                setTimeout(() => message.remove(), 300);
-            }, 2000);
-        }
-
+        // ============================================
+        // MODAL FUNKTIONEN
+        // ============================================
         function showAddShiftModal() {
             const employees = users.filter(u => u.role !== 'admin');
             
@@ -3487,7 +3506,7 @@
             
             document.body.appendChild(modal);
         }
-
+        
         function addShift() {
             const employeeId = document.getElementById('shiftEmployee').value;
             const location = document.getElementById('shiftLocation').value;
@@ -3500,129 +3519,34 @@
             if (location && date) {
                 const newShift = {
                     id: Date.now().toString(),
-                    employeeIds: employeeId ? [employeeId] : [], // Array statt einzelne ID
+                    employeeIds: employeeId ? [employeeId] : [],
                     location: location,
                     date: date,
                     time: `${startTime}-${endTime}`,
                     type: type,
-                    breakMinutes: breakTime, // Pausenzeit in Minuten
+                    breakMinutes: breakTime,
                     viewedBy: [],
-                    attendance: {}, // { userId: { present: true/false, confirmedBy: userId, confirmedAt: timestamp, hours: X } }
-                    completed: false
+                    attendance: {},
+                    completed: false,
+                    createdAt: new Date().toISOString(),
+                    createdBy: currentUser.id
                 };
                 
                 shifts.push(newShift);
-                
-                saveData(); // Speichern
+                saveData();
                 document.querySelector('.modal-overlay').remove();
                 renderContent();
                 
-                if (employeeId) {
-                    const employee = users.find(u => u.id === employeeId);
-                    alert(`✅ Schicht erstellt und gespeichert!\n\nMitarbeiter: ${employee?.name}\nStandort: ${location}\nDatum: ${new Date(date).toLocaleDateString('de-DE')}\nPausenzeit: ${breakTime} Min\n\nSie können weitere Mitarbeiter nachträglich hinzufügen.`);
-                } else {
-                    alert(`✅ Schicht erstellt und gespeichert!\n\nStandort: ${location}\nDatum: ${new Date(date).toLocaleDateString('de-DE')}\nPausenzeit: ${breakTime} Min\n\nSie können Mitarbeiter nachträglich hinzufügen.`);
-                }
+                const syncMessage = isOnline && !offlineMode ? 
+                    ' (wurde mit allen Geräten synchronisiert)' : 
+                    ' (wird synchronisiert wenn Online)';
+                
+                showNotification(`Schicht erstellt${syncMessage}`, 'success');
             } else {
-                alert('Bitte mindestens Standort und Datum ausfüllen');
+                showNotification('Bitte mindestens Standort und Datum ausfüllen', 'error');
             }
         }
-
-        function editShift(id) {
-            const shift = shifts.find(s => s.id === id);
-            if (!shift) return;
-            
-            const [startTime, endTime] = shift.time.split('-');
-            const employees = users.filter(u => u.role !== 'admin');
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.innerHTML = `
-                <div class="modal">
-                    <div class="modal-header">
-                        <h3 class="modal-title">Schicht bearbeiten</h3>
-                        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">
-                            ${getIcon('x')}
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label class="form-label">Mitarbeiter *</label>
-                            <select id="editShiftEmployee" class="form-input">
-                                <option value="">Mitarbeiter wählen...</option>
-                                ${employees.map(emp => `<option value="${emp.id}" ${emp.id === shift.employeeId ? 'selected' : ''}>${emp.name}</option>`).join('')}
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Standort *</label>
-                            <input type="text" id="editShiftLocation" class="form-input" value="${shift.location}">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Datum *</label>
-                            <input type="date" id="editShiftDate" class="form-input" value="${shift.date}">
-                        </div>
-                        
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label class="form-label">Von *</label>
-                                <input type="time" id="editShiftStart" class="form-input" value="${startTime}">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Bis *</label>
-                                <input type="time" id="editShiftEnd" class="form-input" value="${endTime}">
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Typ *</label>
-                            <select id="editShiftType" class="form-input">
-                                <option value="Veranstaltung" ${shift.type === 'Veranstaltung' ? 'selected' : ''}>Veranstaltung</option>
-                                <option value="Objektschutz" ${shift.type === 'Objektschutz' ? 'selected' : ''}>Objektschutz</option>
-                                <option value="Revierdienst" ${shift.type === 'Revierdienst' ? 'selected' : ''}>Revierdienst</option>
-                                <option value="Empfang" ${shift.type === 'Empfang' ? 'selected' : ''}>Empfang</option>
-                            </select>
-                        </div>
-                        
-                        <div class="modal-actions">
-                            <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Abbrechen</button>
-                            <button class="btn-submit" onclick="updateShift('${id}')">Speichern</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-        }
-
-        function updateShift(id) {
-            const shift = shifts.find(s => s.id === id);
-            if (!shift) return;
-            
-            shift.employeeId = document.getElementById('editShiftEmployee').value;
-            shift.location = document.getElementById('editShiftLocation').value;
-            shift.date = document.getElementById('editShiftDate').value;
-            const startTime = document.getElementById('editShiftStart').value;
-            const endTime = document.getElementById('editShiftEnd').value;
-            shift.time = `${startTime}-${endTime}`;
-            shift.type = document.getElementById('editShiftType').value;
-            
-            saveData(); // Speichern
-            document.querySelector('.modal-overlay').remove();
-            renderContent();
-            alert('✅ Schicht aktualisiert und gespeichert!');
-        }
-
-        function deleteShift(id) {
-            if (confirm('Möchten Sie diese Schicht wirklich löschen?')) {
-                shifts = shifts.filter(s => s.id !== id);
-                saveData(); // Speichern
-                renderContent();
-                alert('✅ Schicht gelöscht und gespeichert!');
-            }
-        }
-
+        
         function showAddEmployeeModal() {
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
@@ -3707,7 +3631,7 @@
             
             document.body.appendChild(modal);
         }
-
+        
         function addEmployee() {
             const name = document.getElementById('empName').value;
             const username = document.getElementById('empUsername').value;
@@ -3718,17 +3642,22 @@
             const phone = document.getElementById('empPhone').value;
             
             if (!name || !username || !password) {
-                alert('Bitte Name, Benutzername und Passwort ausfüllen');
+                showNotification('Bitte Name, Benutzername und Passwort ausfüllen', 'error');
                 return;
             }
             
             if (password.length < 6) {
-                alert('Das Passwort muss mindestens 6 Zeichen lang sein.');
+                showNotification('Das Passwort muss mindestens 6 Zeichen lang sein.', 'error');
+                return;
+            }
+            
+            if (username === MAIN_ADMIN.username) {
+                showNotification('Dieser Benutzername ist für den Hauptadmin reserviert!', 'error');
                 return;
             }
             
             if (users.find(u => u.username === username)) {
-                alert('Dieser Benutzername existiert bereits!');
+                showNotification('Dieser Benutzername existiert bereits!', 'error');
                 return;
             }
             
@@ -3740,7 +3669,7 @@
                 canEditOwnShifts: true
             };
             
-            users.push({
+            const newEmployee = {
                 id: Date.now().toString(),
                 name: name,
                 username: username,
@@ -3754,22 +3683,290 @@
                 lastSeen: new Date().toLocaleString('de-DE'),
                 email: email,
                 phone: phone,
-                permissions: permissions
-            });
+                permissions: permissions,
+                createdBy: currentUser.id,
+                createdAt: new Date().toISOString()
+            };
             
-            saveData(); // Speichern
+            users.push(newEmployee);
+            saveData();
             document.querySelector('.modal-overlay').remove();
             renderContent();
             
-            const perms = [];
-            if (permissions.canManageShifts) perms.push('- Schichten verwalten');
-            if (permissions.canManageEmployees) perms.push('- Mitarbeiter verwalten');
-            if (permissions.canAssignShifts) perms.push('- Schichten zuweisen');
-            if (permissions.canViewAllShifts) perms.push('- Alle Schichten sehen');
+            const syncMessage = isOnline && !offlineMode ? 
+                ' (wurde mit allen Geräten synchronisiert)' : 
+                ' (wird synchronisiert wenn Online)';
             
-            alert(`✅ Mitarbeiter ${name} wurde erstellt und gespeichert!\n\nRolle: ${ROLES[role].label}\n\nLogin:\nBenutzername: ${username}\nPasswort: ${password}\n\n${perms.length > 0 ? 'Berechtigungen:\n' + perms.join('\n') : 'Keine erweiterten Berechtigungen'}`);
+            showNotification(`Mitarbeiter ${name} erstellt${syncMessage}`, 'success');
         }
-
+        
+        function addMyselfToShift(shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) {
+                showNotification('Fehler: Schicht nicht gefunden!', 'error');
+                return;
+            }
+            
+            if (!shift.employeeIds) shift.employeeIds = [];
+            
+            if (shift.employeeIds.includes(currentUser.id)) {
+                showNotification('Sie sind bereits für diese Schicht eingetragen!', 'error');
+                return;
+            }
+            
+            shift.employeeIds.push(currentUser.id);
+            saveData();
+            renderContent();
+            
+            showNotification(`✅ Sie wurden für die Schicht eingetragen!`, 'success');
+        }
+        
+        function addEmployeeToShift(shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) return;
+            
+            const availableEmployees = users.filter(u => 
+                u.role !== 'admin' && 
+                !(shift.employeeIds || []).includes(u.id)
+            );
+            
+            if (availableEmployees.length === 0) {
+                showNotification('Alle Mitarbeiter sind bereits dieser Schicht zugewiesen.', 'error');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Mitarbeiter hinzufügen</h3>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
+                            ${getIcon('x')}
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="form-label">Standort: ${shift.location}</label>
+                            <label class="form-label">Datum: ${new Date(shift.date).toLocaleDateString('de-DE')} • ${shift.time}</label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Mitarbeiter auswählen</label>
+                            <select id="addEmployeeSelect" class="form-input">
+                                <option value="">-- Mitarbeiter wählen --</option>
+                                ${availableEmployees.map(emp => `
+                                    <option value="${emp.id}">${emp.name} (${ROLES[emp.role]?.label})</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Abbrechen</button>
+                            <button class="btn-primary" onclick="confirmAddEmployeeToShift('${shiftId}')">Hinzufügen</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function confirmAddEmployeeToShift(shiftId) {
+            const employeeId = document.getElementById('addEmployeeSelect').value;
+            if (!employeeId) {
+                showNotification('Bitte wählen Sie einen Mitarbeiter aus.', 'error');
+                return;
+            }
+            
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) return;
+            
+            if (!shift.employeeIds) shift.employeeIds = [];
+            
+            if (!shift.employeeIds.includes(employeeId)) {
+                shift.employeeIds.push(employeeId);
+                saveData();
+                
+                const employee = users.find(u => u.id === employeeId);
+                showNotification(`✅ ${employee?.name} wurde der Schicht hinzugefügt!`, 'success');
+            }
+            
+            document.querySelector('.modal-overlay').remove();
+            renderContent();
+        }
+        
+        function removeEmployeeFromShift(shiftId, employeeId) {
+            console.log('removeEmployeeFromShift called:', shiftId, employeeId);
+            
+            const shift = shifts.find(s => s.id === shiftId);
+            const employee = users.find(u => u.id === employeeId);
+            
+            if (!shift || !employee) {
+                showNotification('Fehler: Schicht oder Mitarbeiter nicht gefunden!', 'error');
+                return;
+            }
+            
+            shift.employeeIds = (shift.employeeIds || []).filter(id => id !== employeeId);
+            saveData();
+            renderContent();
+            
+            showNotification(`✅ ${employee.name} wurde entfernt!`, 'success');
+        }
+        
+        function toggleAttendance(shiftId, employeeId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) return;
+            
+            if (!shift.attendance) shift.attendance = {};
+            
+            const employee = users.find(u => u.id === employeeId);
+            const currentStatus = shift.attendance[employeeId]?.present || false;
+            
+            if (currentStatus) {
+                delete shift.attendance[employeeId];
+            } else {
+                const timeEntry = timeEntries.find(e => 
+                    e.userId === employeeId && 
+                    e.date === shift.date && 
+                    e.endTime
+                );
+                
+                const workedMs = timeEntry ? 
+                    (new Date(timeEntry.endTime).getTime() - new Date(timeEntry.startTime).getTime() - (timeEntry.pauseDuration || 0)) : 
+                    0;
+                const workedHours = (workedMs / (1000 * 60 * 60)).toFixed(2);
+                
+                shift.attendance[employeeId] = {
+                    present: true,
+                    confirmedBy: currentUser.id,
+                    confirmedAt: new Date().toISOString(),
+                    hours: parseFloat(workedHours)
+                };
+            }
+            
+            saveData();
+            renderContent();
+            
+            showNotification(currentStatus ? 
+                `${employee?.name} als abwesend markiert` : 
+                `✓ ${employee?.name} Anwesenheit bestätigt`, 'success');
+        }
+        
+        function completeShift(shiftId) {
+            const shift = shifts.find(s => s.id === shiftId);
+            if (!shift) return;
+            
+            const assignedCount = (shift.employeeIds || []).length;
+            const confirmedCount = Object.keys(shift.attendance || {}).length;
+            
+            if (confirmedCount === 0) {
+                showNotification('Bitte bestätigen Sie mindestens einen Mitarbeiter bevor Sie die Schicht abschließen.', 'error');
+                return;
+            }
+            
+            if (confirm(`Schicht abschließen?\n\n${confirmedCount} von ${assignedCount} Mitarbeiter(n) bestätigt.\n\nNach dem Abschluss können keine Änderungen mehr vorgenommen werden.`)) {
+                shift.completed = true;
+                shift.completedBy = currentUser.id;
+                shift.completedAt = new Date().toISOString();
+                
+                saveData();
+                renderContent();
+                
+                showNotification(`✅ Schicht abgeschlossen!\n\nStandort: ${shift.location}\nBestätigte Mitarbeiter: ${confirmedCount}`, 'success');
+            }
+        }
+        
+        function editShift(id) {
+            const shift = shifts.find(s => s.id === id);
+            if (!shift) return;
+            
+            const [startTime, endTime] = shift.time.split('-');
+            const employees = users.filter(u => u.role !== 'admin');
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Schicht bearbeiten</h3>
+                        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">
+                            ${getIcon('x')}
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="form-label">Standort *</label>
+                            <input type="text" id="editShiftLocation" class="form-input" value="${shift.location}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Datum *</label>
+                            <input type="date" id="editShiftDate" class="form-input" value="${shift.date}">
+                        </div>
+                        
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Von *</label>
+                                <input type="time" id="editShiftStart" class="form-input" value="${startTime}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Bis *</label>
+                                <input type="time" id="editShiftEnd" class="form-input" value="${endTime}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Typ *</label>
+                            <select id="editShiftType" class="form-input">
+                                <option value="Veranstaltung" ${shift.type === 'Veranstaltung' ? 'selected' : ''}>Veranstaltung</option>
+                                <option value="Objektschutz" ${shift.type === 'Objektschutz' ? 'selected' : ''}>Objektschutz</option>
+                                <option value="Empfang" ${shift.type === 'Empfang' ? 'selected' : ''}>Empfang</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Pausenzeit (Minuten)</label>
+                            <input type="number" id="editShiftBreakTime" class="form-input" value="${shift.breakMinutes || 0}" min="0" max="120">
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Abbrechen</button>
+                            <button class="btn-submit" onclick="updateShift('${id}')">Speichern</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function updateShift(id) {
+            const shift = shifts.find(s => s.id === id);
+            if (!shift) return;
+            
+            shift.location = document.getElementById('editShiftLocation').value;
+            shift.date = document.getElementById('editShiftDate').value;
+            const startTime = document.getElementById('editShiftStart').value;
+            const endTime = document.getElementById('editShiftEnd').value;
+            shift.time = `${startTime}-${endTime}`;
+            shift.type = document.getElementById('editShiftType').value;
+            shift.breakMinutes = parseInt(document.getElementById('editShiftBreakTime').value) || 0;
+            
+            saveData();
+            document.querySelector('.modal-overlay').remove();
+            renderContent();
+            showNotification('✅ Schicht aktualisiert!', 'success');
+        }
+        
+        function deleteShift(id) {
+            if (confirm('Möchten Sie diese Schicht wirklich löschen?')) {
+                shifts = shifts.filter(s => s.id !== id);
+                saveData();
+                renderContent();
+                showNotification('✅ Schicht gelöscht!', 'success');
+            }
+        }
+        
         function editEmployee(id) {
             const employee = users.find(u => u.id === id);
             if (!employee) return;
@@ -3857,7 +4054,7 @@
             
             document.body.appendChild(modal);
         }
-
+        
         function updateEmployee(id) {
             const employee = users.find(u => u.id === id);
             if (!employee) return;
@@ -3867,18 +4064,18 @@
             const password = document.getElementById('editEmpPassword').value;
             
             if (!name || !username) {
-                alert('Bitte Name und Benutzername ausfüllen');
+                showNotification('Bitte Name und Benutzername ausfüllen', 'error');
                 return;
             }
             
             const existingUser = users.find(u => u.username === username && u.id !== id);
             if (existingUser) {
-                alert('Dieser Benutzername wird bereits von einem anderen Mitarbeiter verwendet!');
+                showNotification('Dieser Benutzername wird bereits von einem anderen Mitarbeiter verwendet!', 'error');
                 return;
             }
             
             if (password && password.length < 6) {
-                alert('Das Passwort muss mindestens 6 Zeichen lang sein.');
+                showNotification('Das Passwort muss mindestens 6 Zeichen lang sein.', 'error');
                 return;
             }
             
@@ -3897,26 +4094,91 @@
                 canEditOwnShifts: true
             };
             
-            saveData(); // Speichern
+            saveData();
             document.querySelector('.modal-overlay').remove();
             renderContent();
-            alert(`✅ Mitarbeiter ${name} wurde aktualisiert und gespeichert!`);
+            showNotification(`✅ Mitarbeiter ${name} wurde aktualisiert!`, 'success');
         }
-
+        
         function deleteEmployee(id) {
             const employee = users.find(u => u.id === id);
             if (!employee) return;
             
             if (confirm(`Möchten Sie ${employee.name} wirklich löschen?\n\nAlle zugewiesenen Schichten werden freigegeben.`)) {
                 users = users.filter(u => u.id !== id);
-                shifts = shifts.map(s => s.employeeId === id ? {...s, employeeId: null} : s);
-                saveData(); // Speichern
+                shifts = shifts.map(s => {
+                    if (s.employeeIds && s.employeeIds.includes(id)) {
+                        return {
+                            ...s,
+                            employeeIds: s.employeeIds.filter(eid => eid !== id)
+                        };
+                    }
+                    return s;
+                });
+                saveData();
                 renderContent();
-                alert(`✅ ${employee.name} wurde gelöscht und alle Daten gespeichert.`);
+                showNotification(`✅ ${employee.name} wurde gelöscht.`, 'success');
+            }
+        }
+        
+        function searchEmployees(term) {
+            const employees = users.filter(u => u.role !== 'admin');
+            const filtered = employees.filter(emp => 
+                emp.name.toLowerCase().includes(term.toLowerCase()) ||
+                emp.regNumber.toLowerCase().includes(term.toLowerCase())
+            );
+            
+            const list = document.getElementById('employeeList');
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-title">Keine Mitarbeiter gefunden</div></div>';
+            } else {
+                list.innerHTML = filtered.map(emp => {
+                    const empShifts = shifts.filter(s => s.employeeId === emp.id);
+                    const perms = [];
+                    if (emp.permissions) {
+                        if (emp.permissions.canManageShifts) perms.push('Schichten verwalten');
+                        if (emp.permissions.canManageEmployees) perms.push('Personal');
+                        if (emp.permissions.canAssignShifts) perms.push('Zuweisung');
+                    }
+                    
+                    return `
+                        <div class="employee-item">
+                            <div class="employee-left">
+                                <div class="employee-avatar-large">${getInitials(emp.name)}</div>
+                                <div class="employee-details">
+                                    <div class="employee-name">
+                                        ${emp.name}
+                                        <span class="badge badge-${getRoleBadgeColor(emp.role)}">
+                                            ${ROLES[emp.role]?.label || emp.role}
+                                        </span>
+                                    </div>
+                                    <div class="employee-meta">
+                                        ${emp.regNumber || emp.username} • ${empShifts.length} Schichten
+                                    </div>
+                                    ${perms.length > 0 ? `
+                                        <div style="font-size: 0.75rem; color: #10b981; margin-top: 0.25rem;">
+                                            🔑 ${perms.join(', ')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="employee-actions">
+                                <button class="btn-icon edit" onclick="editEmployee('${emp.id}')">
+                                    ${getIcon('edit')}
+                                </button>
+                                <button class="btn-icon delete" onclick="deleteEmployee('${emp.id}')">
+                                    ${getIcon('trash')}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
         }
 
-        // Helper Functions
+        // ============================================
+        // HELPER FUNCTIONS
+        // ============================================
         function getInitials(name) {
             return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
         }
@@ -3924,13 +4186,15 @@
         function getRoleBadgeColor(role) {
             const colors = {
                 admin: 'red',
+                kleinadmin: 'orange',
+                einsatzleiter: 'purple',
                 supervisor: 'purple',
                 teamleader: 'blue',
                 security_guard: 'gray',
                 trainee: 'gray',
                 doorman: 'gray',
                 event_security: 'gray',
-                patrol: 'gray',
+                ordner: 'gray',
                 reception: 'gray'
             };
             return colors[role] || 'gray';
@@ -3959,8 +4223,56 @@
             };
             return icons[name] || '';
         }
+        
+        function markAllShiftsAsViewed() {
+            let updated = false;
+            shifts.forEach(shift => {
+                if (!shift.viewedBy) shift.viewedBy = [];
+                if (!shift.viewedBy.includes(currentUser.id)) {
+                    shift.viewedBy.push(currentUser.id);
+                    updated = true;
+                }
+            });
+            if (updated) {
+                saveData();
+            }
+        }
+        
+        function checkAndStartShiftTimer() {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            
+            const currentShift = shifts.find(shift => {
+                if (shift.date !== today) return false;
+                if (!(shift.employeeIds || []).includes(currentUser.id)) return false;
+                
+                const [start, end] = shift.time.split('-');
+                const [startH, startM] = start.split(':').map(Number);
+                const [endH, endM] = end.split(':').map(Number);
+                const shiftStart = startH * 60 + startM;
+                const shiftEnd = endH * 60 + endM;
+                
+                return currentTime >= shiftStart && currentTime <= shiftEnd;
+            });
+            
+            if (currentShift) {
+                const todayEntries = timeEntries.filter(e => 
+                    e.userId === currentUser.id && 
+                    e.date === today &&
+                    !e.endTime
+                );
+                
+                if (todayEntries.length === 0) {
+                    console.log('Auto-starting timer for current shift');
+                    startTimer();
+                }
+            }
+        }
 
-        // Start App
+        // ============================================
+        // START APP
+        // ============================================
         init();
     </script>
 </body>
